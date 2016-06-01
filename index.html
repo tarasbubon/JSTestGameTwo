@@ -11,20 +11,31 @@ var timeWhenGameStarted = Date.now();
 var frameCount = 0;
 
 var score = 0;
+var player;
 
-var player = {
-	x:30,
-	spdX:30,
-	y:40,
-	spdY:5,
-	name:'P',
-	hp:10,
-	width:20,
-	height:20,
-	color:'green',
-	
-	attackSpeed:1,
-};
+createPlayer = function()
+{
+	player = {
+		type:'player',
+		x:50,
+		spdX:50,
+		y:40,
+		spdY:5,
+		name:'P',
+		hp:10,
+		width:20,
+		height:20,
+		color:'green',
+		
+		attackSpeed:1,
+		attackCounter:0,
+		pressingDown:false,
+		pressingUp:false,
+		pressingLeft:false,
+		pressingRight:false,
+		aimAngle:0,
+	};
+}
 
 var enemyList = {};
 var upgradeList = {};
@@ -59,6 +70,7 @@ testCollisionEntity = function(entity1, entity2)
 Enemy = function(id, x, y, spdX, spdY, width, height)
 {
 	var enemy = {
+		type:'enemy',
 		x:x,
 		y:y,
 		spdX:spdX,
@@ -68,6 +80,10 @@ Enemy = function(id, x, y, spdX, spdY, width, height)
 		width:width,
 		height,height,
 		color:'red',
+		
+		aimAngle:0,
+		attackSpeed:1,
+		attackCounter:0,
 	};
 	enemyList[id] = enemy;
 }
@@ -88,6 +104,7 @@ randomlyGenerateEnemy = function()
 Upgrade = function(id, x, y, spdX, spdY, width, height, category, color)
 {
 	var upgrade = {
+		type:'upgrade',
 		x:x,
 		y:y,
 		spdX:spdX,
@@ -129,6 +146,7 @@ randomlyGenerateUpgrade = function()
 Bullet = function(id, x, y, spdX, spdY, width, height)
 {
 	var bullet = {
+		type:'bullet',
 		x:x,
 		y:y,
 		spdX:spdX,
@@ -144,15 +162,19 @@ Bullet = function(id, x, y, spdX, spdY, width, height)
 	bulletList[id] = bullet;
 }
 
-randomlyGenerateBullet = function()
+generateBullet = function(actor, overwriteAngle)
 {
-	var x = player.x;
-	var y = player.y;
+	var x = actor.x;
+	var y = actor.y;
 	var width = 10;
 	var height = 10;
 	var id = Math.random();
 	
-	var angle = Math.random() * 360;
+	var angle = actor.aimAngle;
+	if(overwriteAngle !== undefined)
+	{
+		angle = overwriteAngle;
+	}
 	var spdX = Math.cos(angle / 180 * Math.PI) * 5;
 	var spdY = Math.sin(angle / 180 * Math.PI) * 5;
 	Bullet(id, x, y, spdX, spdY, width, height);
@@ -163,45 +185,69 @@ document.onmousemove = function(mouse)
 	var mouseX = mouse.clientX - document.getElementById('ctx').getBoundingClientRect().left;
 	var mouseY = mouse.clientY - document.getElementById('ctx').getBoundingClientRect().top;
 	
-	if(mouseX < player.width / 2)
-	{
-		mouseX = player.width / 2;
-	}
-	if(mouseX > WIDTH - player.width / 2)
-	{
-		mouseX = WIDTH - player.width / 2;
-	}
-	if(mouseY < player.height / 2)
-	{
-		mouseY = player.height / 2;
-	}
-	if(mouseY > HEIGHT - player.height / 2)
-	{
-		mouseY = HEIGHT - player.height / 2;
-	}
+	mouseX -= player.x;
+	mouseY -= player.y;
 	
-	player.x = mouseX;
-	player.y = mouseY;
+	player.aimAngle = Math.atan2(mouseY, mouseX) / Math.PI * 180;
 }
 
-updateEntity = function(something)
+updateEntity = function(entity)
 {
-	updateEntityPosition(something);
-	drawEntity(something);
+	updateEntityPosition(entity);
+	drawEntity(entity);
 }
 
-updateEntityPosition = function(something)
+updateEntityPosition = function(entity)
 {
-	something.x += something.spdX;
-	something.y += something.spdY;
-	
-	if(something.x < 0 || something.x > WIDTH)
+	if(entity.type === 'player')
 	{
-		something.spdX = -something.spdX;
+		if(player.pressingRight)
+		{
+			player.x += 10;
+		}
+		if(player.pressingLeft)
+		{
+			player.x -= 10;
+		}
+		if(player.pressingDown)
+		{
+			player.y += 10;
+		}
+		if(player.pressingUp)
+		{
+			player.y -= 10;
+		}
+		
+		if(player.x < player.width / 2)
+		{
+			player.x = player.width / 2;
+		}
+		if(player.x > WIDTH - player.width / 2)
+		{
+			player.x = WIDTH - player.width / 2;
+		}
+		if(player.y < player.height / 2)
+		{
+			player.y = player.height / 2;
+		}
+		if(player.y > HEIGHT - player.height / 2)
+		{
+			player.y = HEIGHT - player.height / 2;
+		}
 	}
-	if(something.y < 0 || something.y > HEIGHT)
+	else 
 	{
-		something.spdY = -something.spdY;
+		entity.x += entity.spdX;
+		entity.y += entity.spdY;
+		
+		if(entity.x < 0 || entity.x > WIDTH)
+		{
+			entity.spdX = -entity.spdX;
+		}
+		if(entity.y < 0 || entity.y > HEIGHT)
+		{
+			entity.spdY = -entity.spdY;
+		}
 	}
 }
 
@@ -213,12 +259,89 @@ testCollisionPosition = function(rect1, rect2)
 		&& rect2.y <= rect1.y + rect1.height;
 }
 
-drawEntity= function(something)
+drawEntity= function(entity)
 {
 	ctx.save();
-	ctx.fillStyle = something.color;
-	ctx.fillRect(something.x - something.width / 2,  something.y - something.height / 2, something.width, something.height);
+	ctx.fillStyle = entity.color;
+	ctx.fillRect(entity.x - entity.width / 2,  entity.y - entity.height / 2, entity.width, entity.height);
 	ctx.restore();
+}
+
+document.onclick = function(mouse)
+{
+	performAttack(player);
+}
+
+performAttack = function(actor)
+{
+	if(actor.attackCounter > 25)
+	{
+		actor.attackCounter = 0;
+		generateBullet(actor);
+	}
+}
+
+document.oncontextmenu = function(mouse)
+{
+	performSpecialAttack(player);
+	mouse.preventDefault();
+}
+
+performSpecialAttack = function(actor)
+{
+	if(actor.attackCounter > 50)
+	{
+		actor.attackCounter = 0;
+		/*
+		for(var i = 0; i < 360; i++)
+		{
+			generateBullet(actor, i);
+		}
+		*/
+		generateBullet(actor, actor.aimAngle - 5);
+		generateBullet(actor, actor.aimAngle);
+		generateBullet(actor, actor.aimAngle + 5);
+	}
+}
+
+document.onkeydown = function(event)
+{
+	if(event.keyCode === 68)
+	{
+		player.pressingRight = true;
+	}		
+	else if(event.keyCode === 83)
+	{
+		player.pressingDown = true;
+	}
+	else if(event.keyCode === 65)
+	{
+		player.pressingLeft = true;
+	}
+	else if(event.keyCode === 87)
+	{
+		player.pressingUp = true;
+	}
+}
+
+document.onkeyup = function(event)
+{
+	if(event.keyCode === 68)
+	{
+		player.pressingRight = false;
+	}		
+	else if(event.keyCode === 83)
+	{
+		player.pressingDown = false;
+	}
+	else if(event.keyCode === 65)
+	{
+		player.pressingLeft = false;
+	}
+	else if(event.keyCode === 87)
+	{
+		player.pressingUp = false;
+	}
 }
 
 update = function()
@@ -237,10 +360,7 @@ update = function()
 		randomlyGenerateUpgrade();
 	}	
 	
-	if(frameCount % Math.round(25 / player.attackSpeed) === 0)
-	{
-		randomlyGenerateBullet();
-	}	
+	player.attackCounter += player.attackSpeed;	
 		
 	for(var enemy in enemyList)
 	{
@@ -307,7 +427,7 @@ update = function()
 		startNewGame();
 	}
 	
-	drawEntity(player);
+	updateEntity(player);
 	ctx.fillText(player.hp + ' hp', 0, 30);
 	ctx.fillText('Score: ' + score, 200, 30);
 }
@@ -326,6 +446,7 @@ startNewGame = function()
 	randomlyGenerateEnemy();
 }
 
+createPlayer();
 startNewGame();
 
 setInterval(update, 40);
