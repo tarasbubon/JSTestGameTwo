@@ -70,59 +70,9 @@ Player = function()
 {
 	var self = Actor('player', 'myId', 50, 40, 50 * 1.5, 70 * 1.5, Img.player, 10, 1);
 	
-	self.pressingDown = false;
-	self.pressingUp = false;
-	self.pressingLeft = false;
-	self.pressingRight = false;
-	
+	self.maxMoveSpeed = 10;
 	self.pressingMouseLeft = false;
 	self.pressingMouseRight = false;
-	
-	self.updatePosition = function()
-	{
-		var oldX = self.x;
-		var oldY = self.y;
-		
-		if(player.pressingRight)
-			{
-				player.x += 10;
-			}
-			if(player.pressingLeft)
-			{
-				player.x -= 10;
-			}
-			if(player.pressingDown)
-			{
-				player.y += 10;
-			}
-			if(player.pressingUp)
-			{
-				player.y -= 10;
-			}
-			
-			if(player.x < player.width / 2)
-			{
-				player.x = player.width / 2;
-			}
-			if(player.x > Maps.current.width - player.width / 2)
-			{
-				player.x = Maps.current.width - player.width / 2;
-			}
-			if(player.y < player.height / 2)
-			{
-				player.y = player.height / 2;
-			}
-			if(player.y > Maps.current.height - player.height / 2)
-			{
-				player.y = Maps.current.height - player.height / 2;
-			}
-			
-			if(Maps.current.isPositionWall(self))
-			{
-				self.x = oldX;
-				self.y = oldY;
-			}
-	}
 	
 	self.onDeath = function()
 	{
@@ -161,6 +111,12 @@ Actor= function(type, id, x, y, width, height, img, hp, attackSpeed)
 	self.attackCounter = 0;
 	self.aimAngle = 0;
 	self.spriteAnimCounter = 0;
+	
+	self.pressingDown = false;
+	self.pressingUp = false;
+	self.pressingLeft = false;
+	self.pressingRight = false;
+	self.maxMoveSpeed = 3;
 	
 	self.performAttack = function()
 	{
@@ -224,6 +180,78 @@ Actor= function(type, id, x, y, width, height, img, hp, attackSpeed)
 		ctx.restore();
 	}
 	
+	self.updatePosition = function()
+	{	
+		var leftBump = {x:self.x - 40, y:self.y};
+		var rightBumper = {x:self.x + 40, y:self.y};
+		var upBumper = {x:self.x, y:self.y -16};
+		var downBumper = {x:self.x, y:self.y + 64};
+		
+		if(Maps.current.isPositionWall(rightBumper))
+		{
+			self.x -= 5;
+		}
+		else
+		{
+			if(self.pressingRight)
+			{
+				self.x += self.maxMoveSpeed;
+			}
+		}
+		
+		if(Maps.current.isPositionWall(leftBump))
+		{
+			self.x += 5;
+		}
+		else
+		{
+			if(self.pressingLeft)
+			{
+				self.x -= self.maxMoveSpeed;
+			}
+		}
+		
+		if(Maps.current.isPositionWall(downBumper))
+		{
+			self.y -= 5;
+		}
+		else
+		{
+			if(self.pressingDown)
+			{
+				self.y += self.maxMoveSpeed;
+			}
+		}
+		if(Maps.current.isPositionWall(upBumper))
+		{
+			self.y += 5;
+		}
+		else
+		{
+			if(self.pressingUp)
+			{
+				self.y -= self.maxMoveSpeed;
+			}
+		}
+			
+		if(self.x < self.width / 2)
+		{
+			self.x = self.width / 2;
+		}
+		if(self.x > Maps.current.width - self.width / 2)
+		{
+			self.x = Maps.current.width - self.width / 2;
+		}
+		if(self.y < self.height / 2)
+		{
+			self.y = self.height / 2;
+		}
+		if(self.y > Maps.current.height - self.height / 2)
+		{
+			self.y = Maps.current.height - self.height / 2;
+		}
+	}
+	
 	self.onDeath = function(){}
 	
 	self.performSpecialAttack = function()
@@ -260,37 +288,15 @@ Enemy = function(id, x, y, width, height, img, hp, attackSpeed)
 		self.aimAngle = Math.atan2(differenceY, differenceX) / Math.PI * 180;
 	}
 	
-	self.updatePosition = function()
+	self.updateKeyPress = function()
 	{
-		var oldX = self.x;
-		var oldY = self.y;
-		
 		var differenceX = player.x - self.x;
 		var differenceY = player.y - self.y;
 		
-		if(differenceX > 0)
-		{
-			self.x += 3;
-		}
-		else
-		{
-			self.x -= 3;
-		}
-		
-		if(differenceY > 0)
-		{
-			self.y += 3;
-		}
-		else
-		{
-			self.y -= 3;
-		}
-		
-		if(Maps.current.isPositionWall(self))
-		{
-			self.x = oldX;
-			self.y = oldY;
-		}
+		self.pressingRight = differenceX > 3;
+		self.pressingLeft = differenceX < -3;
+		self.pressingDown = differenceY > 3;
+		self.pressingUp = differenceY < -3;
 	}
 	
 	self.onDeath = function()
@@ -304,6 +310,7 @@ Enemy = function(id, x, y, width, height, img, hp, attackSpeed)
 		super_update();
 		self.spriteAnimCounter += 0.2;
 		self.updateAim();
+		self.updateKeyPress();
 		self.performAttack();
 	}
 	
@@ -445,6 +452,7 @@ Bullet = function(id, x, y, spdX, spdY, width, height, combatType)
 	self.combatType = combatType;
 	self.spdX = spdX;
 	self.spdY = spdY;
+	self.toRemovee = false;
 	
 	self.updatePosition = function()
 	{
@@ -465,11 +473,10 @@ Bullet = function(id, x, y, spdX, spdY, width, height, combatType)
 	self.update = function()
 	{
 		super_update();
-		var toRemove = false;
 		self.timer++;
 		if(self.timer > 75)
 		{
-			toRemove = true;
+			self.toRemove = true;
 		}
 		
 		if(self.combatType === 'player')
@@ -478,7 +485,7 @@ Bullet = function(id, x, y, spdX, spdY, width, height, combatType)
 			{
 				if(self.testCollision(Enemy.list[enemy]))
 				{
-					toRemove = true;
+					self.toRemove = true;
 					Enemy.list[enemy].hp -= 1;
 				}
 			}
@@ -487,19 +494,14 @@ Bullet = function(id, x, y, spdX, spdY, width, height, combatType)
 		{
 			if(self.testCollision(player))
 			{
-				toRemove = true;
+				self.toRemove = true;
 				player.hp -= 1;
 			}
 		}
 		
 		if(Maps.current.isPositionWall(self))
 		{
-			toRemove = true;
-		}
-		
-		if(toRemove)
-		{
-			delete Bullet.list[self.id];
+			self.toRemove = true;
 		}
 	}
 	
@@ -512,7 +514,13 @@ Bullet.update = function()
 {
 	for(var bullet in Bullet.list)
 	{
-		Bullet.list[bullet].update();
+		var b = Bullet.list[bullet];
+		b.update();
+		
+		if(b.toRemove)
+		{
+			delete Bullet.list[bullet];
+		}
 	}
 }
 
